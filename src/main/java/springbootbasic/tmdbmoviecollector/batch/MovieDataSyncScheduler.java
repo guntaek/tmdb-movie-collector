@@ -18,7 +18,7 @@ public class MovieDataSyncScheduler {
     public void syncMovieData() {
         log.info("Starting scheduled movie data sync...");
         try {
-            movieDataService.syncAllMovieData(100); // 각 카테고리별 100페이지
+            movieDataService.syncAllMovieData(100, false); // 각 카테고리별 100페이지
         } catch (Exception e) {
             log.error("Error during scheduled sync: ", e);
         }
