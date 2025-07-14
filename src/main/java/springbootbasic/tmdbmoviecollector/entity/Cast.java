@@ -22,14 +22,15 @@ public class Cast {
     @JoinColumn(name = "movie_id")
     private Movie movie;
 
+    @Column(length = 500)
     private String name;
 
-    @Column(name = "character_name")
+    @Column(name = "character_name", length = 1000)
     private String character;
 
     @Column(name = "cast_order")
     private Integer order;
 
-    @Column(name = "profile_path")
+    @Column(name = "profile_path", length = 500)
     private String profilePath;
 }
