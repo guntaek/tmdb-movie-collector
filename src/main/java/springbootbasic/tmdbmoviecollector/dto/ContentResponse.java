@@ -7,9 +7,14 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Data
-public class MovieResponse {
+public class ContentResponse {
     private Long id;
+
+    @JsonProperty("title")
     private String title;
+
+    @JsonProperty("name")
+    private String name;
 
     @JsonProperty("original_title")
     private String originalTitle;

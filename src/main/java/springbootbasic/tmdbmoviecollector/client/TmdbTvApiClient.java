@@ -14,7 +14,7 @@ import java.time.Duration;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class TmdbApiClient {
+public class TmdbTvApiClient {
 
     private final WebClient webClient;
 
@@ -30,52 +30,52 @@ public class TmdbApiClient {
     @Value("${tmdb.api.retry-delay}")
     private long retryDelay;
 
-    public Mono<MoviePageResponse> getPopularMovies(int page) {
+    public Mono<ContentPageResponse> getOnTheAirTvs(int page) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/popular")
+                        .path("/tv/on_the_air")
                         .queryParam("api_key", apiKey)
                         .queryParam("page", page)
                         .queryParam("language", "ko-KR")
                         .build())
                 .retrieve()
-                .bodyToMono(MoviePageResponse.class)
+                .bodyToMono(ContentPageResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching popular movies page {}: {}", page, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching on the air tvs page {}: {}", page, error.getMessage()));
     }
 
-    public Mono<MoviePageResponse> getTopRatedMovies(int page) {
+    public Mono<ContentPageResponse> getPopularTvs(int page) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/top_rated")
+                        .path("/tv/popular")
                         .queryParam("api_key", apiKey)
                         .queryParam("page", page)
                         .queryParam("language", "ko-KR")
                         .build())
                 .retrieve()
-                .bodyToMono(MoviePageResponse.class)
+                .bodyToMono(ContentPageResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching top rated movies page {}: {}", page, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching popular tvs page {}: {}", page, error.getMessage()));
     }
 
-    public Mono<MoviePageResponse> getUpcomingMovies(int page) {
+    public Mono<ContentPageResponse> getTopRatedTvs(int page) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/upcoming")
+                        .path("/tv/top_rated")
                         .queryParam("api_key", apiKey)
                         .queryParam("page", page)
                         .queryParam("language", "ko-KR")
                         .build())
                 .retrieve()
-                .bodyToMono(MoviePageResponse.class)
+                .bodyToMono(ContentPageResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching upcoming movies page {}: {}", page, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching top rated tvs page {}: {}", page, error.getMessage()));
     }
 
     public Mono<GenreListResponse> getGenres() {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/genre/movie/list")
+                        .path("/genre/tv/list")
                         .queryParam("api_key", apiKey)
                         .queryParam("language", "ko-KR")
                         .build())
@@ -85,70 +85,70 @@ public class TmdbApiClient {
                 .doOnError(error -> log.error("Error fetching genres: {}", error.getMessage()));
     }
 
-    public Mono<MovieDetailResponse> getMovieDetail(Long movieId) {
+    public Mono<ContentDetailResponse> getTvDetail(Long movieId) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/{movie_id}")
+                        .path("/tv/{tv_id}")
                         .queryParam("api_key", apiKey)
                         .queryParam("language", "ko-KR")
                         .build(movieId))
                 .retrieve()
-                .bodyToMono(MovieDetailResponse.class)
+                .bodyToMono(ContentDetailResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching movie detail for {}: {}", movieId, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching tv detail for {}: {}", movieId, error.getMessage()));
     }
 
     // Credits (Cast & Crew)
-    public Mono<CreditsResponse> getMovieCredits(Long movieId) {
+    public Mono<CreditsResponse> getTvCredits(Long movieId) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/{movie_id}/credits")
+                        .path("/tv/{tv_id}/credits")
                         .queryParam("api_key", apiKey)
                         .build(movieId))
                 .retrieve()
                 .bodyToMono(CreditsResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching credits for movie {}: {}", movieId, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching credits for tv {}: {}", movieId, error.getMessage()));
     }
 
     // Images
-    public Mono<ImagesResponse> getMovieImages(Long movieId) {
+    public Mono<ImagesResponse> getTvImages(Long movieId) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/{movie_id}/images")
+                        .path("/tv/{tv_id}/images")
                         .queryParam("api_key", apiKey)
                         .queryParam("include_image_language", "ko,null")
                         .build(movieId))
                 .retrieve()
                 .bodyToMono(ImagesResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching images for movie {}: {}", movieId, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching images for tv {}: {}", movieId, error.getMessage()));
     }
 
     // Videos
-    public Mono<VideosResponse> getMovieVideos(Long movieId) {
+    public Mono<VideosResponse> getTvVideos(Long movieId) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/{movie_id}/videos")
+                        .path("/tv/{tv_id}/videos")
                         .queryParam("api_key", apiKey)
                         .queryParam("language", "ko-KR")
                         .build(movieId))
                 .retrieve()
                 .bodyToMono(VideosResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching videos for movie {}: {}", movieId, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching videos for tv {}: {}", movieId, error.getMessage()));
     }
 
     // Watch Providers
-    public Mono<WatchProvidersResponse> getMovieWatchProviders(Long movieId) {
+    public Mono<WatchProvidersResponse> getTvWatchProviders(Long movieId) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/movie/{movie_id}/watch/providers")
+                        .path("/tv/{tv_id}/watch/providers")
                         .queryParam("api_key", apiKey)
                         .build(movieId))
                 .retrieve()
                 .bodyToMono(WatchProvidersResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
-                .doOnError(error -> log.error("Error fetching watch providers for movie {}: {}", movieId, error.getMessage()));
+                .doOnError(error -> log.error("Error fetching watch providers for tv {}: {}", movieId, error.getMessage()));
     }
 }

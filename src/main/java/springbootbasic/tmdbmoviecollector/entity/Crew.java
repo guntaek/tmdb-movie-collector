@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "crews")
+@Table(name = "crew")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,8 +19,11 @@ public class Crew {
     private Long personId;
 
     @ManyToOne
-    @JoinColumn(name = "movie_id")
-    private Movie movie;
+    @JoinColumns({
+            @JoinColumn(name = "content_id",  referencedColumnName = "id",   nullable = false),
+            @JoinColumn(name = "content_type", referencedColumnName = "type", nullable = false)
+    })
+    private Content content;
 
     private String name;
     private String job;

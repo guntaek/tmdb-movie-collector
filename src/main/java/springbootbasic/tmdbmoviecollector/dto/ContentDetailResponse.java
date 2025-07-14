@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class MovieDetailResponse extends MovieResponse {
+public class ContentDetailResponse extends ContentResponse {
     private Long budget;
     private Long revenue;
     private Integer runtime;

@@ -6,17 +6,20 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "movie_videos")
+@Table(name = "content_video")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class MovieVideo {
+public class ContentVideo {
     @Id
     private String id; // YouTube video ID
 
     @ManyToOne
-    @JoinColumn(name = "movie_id")
-    private Movie movie;
+    @JoinColumns({
+            @JoinColumn(name = "content_id",  referencedColumnName = "id",   nullable = false),
+            @JoinColumn(name = "content_type", referencedColumnName = "type", nullable = false)
+    })
+    private Content content;
 
     private String name;
 

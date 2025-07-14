@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class MoviePageResponse {
+public class ContentPageResponse {
     private Integer page;
 
     @JsonProperty("total_results")
@@ -15,5 +15,5 @@ public class MoviePageResponse {
     @JsonProperty("total_pages")
     private Integer totalPages;
 
-    private List<MovieResponse> results;
+    private List<ContentResponse> results;
 }

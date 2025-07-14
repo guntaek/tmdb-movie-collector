@@ -6,18 +6,21 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "movie_images")
+@Table(name = "content_image")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class MovieImage {
+public class ContentImage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "movie_id")
-    private Movie movie;
+    @JoinColumns({
+            @JoinColumn(name = "content_id",  referencedColumnName = "id",   nullable = false),
+            @JoinColumn(name = "content_type", referencedColumnName = "type", nullable = false)
+    })
+    private Content content;
 
     @Column(name = "file_path")
     private String filePath;
