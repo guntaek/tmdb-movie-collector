@@ -39,6 +39,7 @@ public class ContentDataService {
     private final ContentImageRepository imageRepository;
     private final ContentVideoRepository videoRepository;
     private final WatchProviderRepository watchProviderRepository;
+    private final ProviderRepository providerRepository;
 
     @Transactional
     public void syncGenres() {
@@ -588,24 +589,30 @@ public class ContentDataService {
             // 스트리밍
             if (kr.getFlatrate() != null) {
                 kr.getFlatrate().forEach(p -> {
-                    WatchProvider provider = createWatchProvider(content, p, ProviderType.STREAM, "KR");
-                    watchProviders.add(provider);
+                    WatchProvider watchProvider = createWatchProvider(content, p, ProviderType.STREAM, "KR");
+                    if (watchProvider != null) {
+                        watchProviders.add(watchProvider);
+                    }
                 });
             }
 
             // 대여
             if (kr.getRent() != null) {
                 kr.getRent().forEach(p -> {
-                    WatchProvider provider = createWatchProvider(content, p, ProviderType.RENT, "KR");
-                    watchProviders.add(provider);
+                    WatchProvider watchProvider = createWatchProvider(content, p, ProviderType.RENT, "KR");
+                    if (watchProvider != null) {
+                        watchProviders.add(watchProvider);
+                    }
                 });
             }
 
             // 구매
             if (kr.getBuy() != null) {
                 kr.getBuy().forEach(p -> {
-                    WatchProvider provider = createWatchProvider(content, p, ProviderType.BUY, "KR");
-                    watchProviders.add(provider);
+                    WatchProvider watchProvider = createWatchProvider(content, p, ProviderType.BUY, "KR");
+                    if (watchProvider != null) {
+                        watchProviders.add(watchProvider);
+                    }
                 });
             }
         }
@@ -655,6 +662,99 @@ public class ContentDataService {
                 .blockLast();
     }
 
+    @Transactional
+    public void syncProviderDetails(List<Integer> providerIds) {
+        log.info("Starting provider details sync for {} providers", providerIds.size());
+
+        Flux.fromIterable(providerIds)
+                .concatMap(providerId -> {
+                    log.info("Fetching details for provider ID: {}", providerId);
+                    return tmdbTvApiClient.getProviderDetail(providerId)
+                            .delayElement(Duration.ofMillis(250))
+                            .onErrorResume(error -> {
+                                log.error("Error fetching details for provider {}: {}", providerId, error.getMessage());
+                                return Mono.empty();
+                            });
+                })
+                .doOnNext(detail -> {
+                    updateProviderWithDetails(detail);
+                    log.info("Updated provider: {} with detailed info", detail.getProviderName());
+                })
+                .blockLast();
+
+        Flux.fromIterable(providerIds)
+                .concatMap(providerId -> {
+                    log.info("Fetching details for provider ID: {}", providerId);
+                    return tmdbMovieApiClient.getProviderDetail(providerId)
+                            .delayElement(Duration.ofMillis(250))
+                            .onErrorResume(error -> {
+                                log.error("Error fetching details for provider {}: {}", providerId, error.getMessage());
+                                return Mono.empty();
+                            });
+                })
+                .doOnNext(detail -> {
+                    updateProviderWithDetails(detail);
+                    log.info("Updated provider: {} with detailed info", detail.getProviderName());
+                })
+                .blockLast();
+    }
+
+    private void updateProviderWithDetails(ProviderDetailResponse detail) {
+        providerRepository.findById(detail.getProviderId()).ifPresent(provider -> {
+            provider.setOriginCountry(detail.getOriginCountry());
+            // 기타 추가 정보가 있다면 여기서 업데이트
+            providerRepository.save(provider);
+        });
+    }
+
+    @Transactional
+    public void syncAllProviders() {
+        log.info("Starting synchronization of all available providers...");
+
+        // 영화 Provider 동기화
+        tmdbMovieApiClient.getAllMovieProviders()
+                .doOnNext(response -> log.info("Fetched {} movie providers", response.getResults().size()))
+                .flatMapMany(response -> Flux.fromIterable(response.getResults()))
+                .map(this::convertToProviderEntity)
+                .collectList()
+                .doOnNext(providers -> {
+                    providers.forEach(provider -> {
+                        // 이미 존재하는지 확인 후 저장
+                        if (!providerRepository.existsById(provider.getId())) {
+                            providerRepository.save(provider);
+                        }
+                    });
+                    log.info("Processed {} movie providers", providers.size());
+                })
+                .block();
+
+        // TV Provider 동기화 (영화와 다른 provider가 있을 수 있음)
+        tmdbTvApiClient.getAllTvProviders()
+                .doOnNext(response -> log.info("Fetched {} TV providers", response.getResults().size()))
+                .flatMapMany(response -> Flux.fromIterable(response.getResults()))
+                .map(this::convertToProviderEntity)
+                .collectList()
+                .doOnNext(providers -> {
+                    providers.forEach(provider -> {
+                        // 이미 존재하는지 확인 후 저장 또는 업데이트
+                        providerRepository.findById(provider.getId())
+                                .ifPresentOrElse(
+                                        existing -> {
+                                            // 기존 provider 정보 업데이트 (필요한 경우)
+                                            if (existing.getName() == null || existing.getName().isEmpty()) {
+                                                existing.setName(provider.getName());
+                                                existing.setLogoPath(provider.getLogoPath());
+                                                providerRepository.save(existing);
+                                            }
+                                        },
+                                        () -> providerRepository.save(provider)
+                                );
+                    });
+                    log.info("Processed {} TV providers", providers.size());
+                })
+                .block();
+    }
+
     private void updateActorWithDetails(PersonDetailResponse detail) {
         actorRepository.findById(detail.getId()).ifPresent(actor -> {
             actor.setBiography(detail.getBiography());
@@ -677,14 +777,31 @@ public class ContentDataService {
     }
 
     private WatchProvider createWatchProvider(Content content, WatchProviderInfo info, ProviderType type, String country) {
-        WatchProvider provider = new WatchProvider();
-        provider.setContent(content);
-        provider.setProviderId(info.getProviderId());
-        provider.setProviderName(info.getProviderName());
-        provider.setLogoPath(info.getLogoPath());
-        provider.setType(type);
-        provider.setDisplayPriority(info.getDisplayPriority());
-        provider.setCountry(country);
+        // Provider 조회 또는 생성
+        Provider provider = providerRepository.findById(info.getProviderId())
+                .orElseGet(() -> {
+                    Provider newProvider = new Provider();
+                    newProvider.setId(info.getProviderId());
+                    newProvider.setName(info.getProviderName());
+                    newProvider.setLogoPath(info.getLogoPath());
+                    return providerRepository.save(newProvider);
+                });
+
+        WatchProvider watchProvider = new WatchProvider();
+        watchProvider.setProvider(provider);
+        watchProvider.setContent(content);
+        watchProvider.setType(type);
+        watchProvider.setDisplayPriority(info.getDisplayPriority());
+        watchProvider.setCountry(country);
+
+        return watchProvider;
+    }
+
+    private Provider convertToProviderEntity(ProviderResponse dto) {
+        Provider provider = new Provider();
+        provider.setId(dto.getProviderId());
+        provider.setName(dto.getProviderName());
+        provider.setLogoPath(dto.getLogoPath());
         return provider;
     }
 

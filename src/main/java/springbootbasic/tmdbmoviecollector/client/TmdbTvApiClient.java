@@ -104,6 +104,7 @@ public class TmdbTvApiClient {
                 .uri(uriBuilder -> uriBuilder
                         .path("/tv/{tv_id}/credits")
                         .queryParam("api_key", apiKey)
+
                         .build(movieId))
                 .retrieve()
                 .bodyToMono(CreditsResponse.class)
@@ -163,5 +164,33 @@ public class TmdbTvApiClient {
                 .bodyToMono(PersonDetailResponse.class)
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
                 .doOnError(error -> log.error("Error fetching person detail for {}: {}", personId, error.getMessage()));
+    }
+
+    // 모든 TV Provider 목록 가져오기
+    public Mono<ProviderListResponse> getAllTvProviders() {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/watch/providers/tv")
+                        .queryParam("api_key", apiKey)
+                        .queryParam("language", "ko-KR")
+                        .queryParam("watch_region", "KR")
+                        .build())
+                .retrieve()
+                .bodyToMono(ProviderListResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching tv providers: {}", error.getMessage()));
+    }
+
+    // Provider 상세 정보
+    public Mono<ProviderDetailResponse> getProviderDetail(Integer providerId) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/watch/provider/{provider_id}")
+                        .queryParam("api_key", apiKey)
+                        .build(providerId))
+                .retrieve()
+                .bodyToMono(ProviderDetailResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching provider detail for {}: {}", providerId, error.getMessage()));
     }
 }

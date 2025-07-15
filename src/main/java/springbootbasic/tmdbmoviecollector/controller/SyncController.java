@@ -3,11 +3,14 @@ package springbootbasic.tmdbmoviecollector.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import springbootbasic.tmdbmoviecollector.entity.Provider;
 import springbootbasic.tmdbmoviecollector.repository.ActorRepository;
 import springbootbasic.tmdbmoviecollector.repository.ContentRepository;
 import springbootbasic.tmdbmoviecollector.repository.CrewMemberRepository;
+import springbootbasic.tmdbmoviecollector.repository.ProviderRepository;
 import springbootbasic.tmdbmoviecollector.service.ContentDataService;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +24,7 @@ public class SyncController {
     private final ContentRepository contentRepository;
     private final ActorRepository actorRepository;
     private final CrewMemberRepository crewMemberRepository;
+    private final ProviderRepository providerRepository;
 
     @PostMapping("/genres")
     public ResponseEntity<String> syncGenres() {
@@ -182,5 +186,39 @@ public class SyncController {
         status.put("writers", crewMemberRepository.findByKnownForDepartment("Writing").size());
         status.put("producers", crewMemberRepository.findByKnownForDepartment("Production").size());
         return ResponseEntity.ok(status);
+    }
+
+    @PostMapping("/providers/details")
+    public ResponseEntity<String> syncProviderDetails(@RequestBody List<Integer> providerIds) {
+        contentDataService.syncProviderDetails(providerIds);
+        return ResponseEntity.ok("Provider details synchronization started for " + providerIds.size() + " providers");
+    }
+
+    @GetMapping("/providers/status")
+    public ResponseEntity<Map<String, Object>> getProviderStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("totalProviders", providerRepository.count());
+
+        // 주요 스트리밍 서비스별 통계
+        List<String> majorProviders = Arrays.asList("Netflix", "Disney Plus", "Watcha", "wavve", "Amazon Prime Video");
+        Map<String, Long> providerStats = new HashMap<>();
+
+        for (String providerName : majorProviders) {
+            List<Provider> providers = providerRepository.findByNameContainingIgnoreCase(providerName);
+            if (!providers.isEmpty()) {
+                Provider provider = providers.get(0);
+                long contentCount = providerRepository.findContentsByProviderId(provider.getId()).size();
+                providerStats.put(providerName, contentCount);
+            }
+        }
+
+        status.put("providerStats", providerStats);
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping("/providers/sync-all")
+    public ResponseEntity<String> syncAllProviders() {
+        contentDataService.syncAllProviders();
+        return ResponseEntity.ok("All providers synchronization started");
     }
 }

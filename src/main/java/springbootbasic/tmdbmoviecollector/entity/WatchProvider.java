@@ -17,27 +17,23 @@ public class WatchProvider {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "provider_id", nullable = false)
+    private Provider provider;
+
+    @ManyToOne
     @JoinColumns({
-            @JoinColumn(name = "content_id",  referencedColumnName = "id",   nullable = false),
+            @JoinColumn(name = "content_id", referencedColumnName = "id", nullable = false),
             @JoinColumn(name = "content_type", referencedColumnName = "type", nullable = false)
     })
     private Content content;
 
-    @Column(name = "provider_id")
-    private Integer providerId;
-
-    @Column(name = "provider_name")
-    private String providerName;
-
-    @Column(name = "logo_path")
-    private String logoPath;
-
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private ProviderType type; // STREAM, RENT, BUY
 
     @Column(name = "display_priority")
     private Integer displayPriority;
 
+    @Column(length = 10)
     private String country;
 }
-

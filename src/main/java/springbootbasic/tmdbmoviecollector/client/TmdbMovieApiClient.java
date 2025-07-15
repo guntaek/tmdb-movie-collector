@@ -166,4 +166,32 @@ public class TmdbMovieApiClient {
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
                 .doOnError(error -> log.error("Error fetching watch providers for movie {}: {}", movieId, error.getMessage()));
     }
+
+    // 모든 영화 Provider 목록 가져오기
+    public Mono<ProviderListResponse> getAllMovieProviders() {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/watch/providers/movie")
+                        .queryParam("api_key", apiKey)
+                        .queryParam("language", "ko-KR")
+                        .queryParam("watch_region", "KR")
+                        .build())
+                .retrieve()
+                .bodyToMono(ProviderListResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching movie providers: {}", error.getMessage()));
+    }
+
+    // Provider 상세 정보 (TMDB API에서 직접 제공하지 않을 수도 있음)
+    public Mono<ProviderDetailResponse> getProviderDetail(Integer providerId) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/watch/provider/{provider_id}")
+                        .queryParam("api_key", apiKey)
+                        .build(providerId))
+                .retrieve()
+                .bodyToMono(ProviderDetailResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching provider detail for {}: {}", providerId, error.getMessage()));
+    }
 }
