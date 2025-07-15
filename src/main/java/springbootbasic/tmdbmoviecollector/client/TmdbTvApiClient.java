@@ -151,4 +151,17 @@ public class TmdbTvApiClient {
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
                 .doOnError(error -> log.error("Error fetching watch providers for tv {}: {}", movieId, error.getMessage()));
     }
+
+    public Mono<PersonDetailResponse> getPersonDetail(Long personId) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/person/{person_id}")
+                        .queryParam("api_key", apiKey)
+                        .queryParam("language", "ko-KR")
+                        .build(personId))
+                .retrieve()
+                .bodyToMono(PersonDetailResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching person detail for {}: {}", personId, error.getMessage()));
+    }
 }

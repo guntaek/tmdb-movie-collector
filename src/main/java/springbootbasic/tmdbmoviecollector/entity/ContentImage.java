@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import springbootbasic.tmdbmoviecollector.entity.type.ImageType;
 
 @Entity
 @Table(name = "content_image")

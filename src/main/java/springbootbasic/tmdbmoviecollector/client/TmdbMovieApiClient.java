@@ -118,6 +118,7 @@ public class TmdbMovieApiClient {
                 .uri(uriBuilder -> uriBuilder
                         .path("/movie/{movie_id}/credits")
                         .queryParam("api_key", apiKey)
+                        .queryParam("language", "ko-KR")
                         .build(movieId))
                 .retrieve()
                 .bodyToMono(CreditsResponse.class)

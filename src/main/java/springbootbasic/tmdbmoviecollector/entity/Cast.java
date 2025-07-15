@@ -15,8 +15,9 @@ public class Cast {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "person_id")
-    private Long personId;
+    @ManyToOne
+    @JoinColumn(name = "actor_id", nullable = false)
+    private Actor actor;
 
     @ManyToOne
     @JoinColumns({
@@ -25,8 +26,8 @@ public class Cast {
     })
     private Content content;
 
-    @Column(length = 500)
-    private String name;
+//    @Column(length = 500)
+//    private String name;
 
     @Column(name = "character_name", length = 1000)
     private String character;
@@ -34,6 +35,6 @@ public class Cast {
     @Column(name = "cast_order")
     private Integer order;
 
-    @Column(name = "profile_path", length = 500)
-    private String profilePath;
+//    @Column(name = "profile_path", length = 500)
+//    private String profilePath;
 }

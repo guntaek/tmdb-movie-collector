@@ -15,8 +15,9 @@ public class Crew {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "person_id")
-    private Long personId;
+    @ManyToOne
+    @JoinColumn(name = "crew_member_id", nullable = false)
+    private CrewMember crewMember;
 
     @ManyToOne
     @JoinColumns({
@@ -25,10 +26,10 @@ public class Crew {
     })
     private Content content;
 
-    private String name;
+//    private String name;
     private String job;
     private String department;
 
-    @Column(name = "profile_path")
-    private String profilePath;
+//    @Column(name = "profile_path")
+//    private String profilePath;
 }

@@ -11,6 +11,8 @@ import springbootbasic.tmdbmoviecollector.client.TmdbTvApiClient;
 import springbootbasic.tmdbmoviecollector.dto.*;
 import springbootbasic.tmdbmoviecollector.entity.*;
 import springbootbasic.tmdbmoviecollector.entity.key.ContentId;
+import springbootbasic.tmdbmoviecollector.entity.type.ImageType;
+import springbootbasic.tmdbmoviecollector.entity.type.ProviderType;
 import springbootbasic.tmdbmoviecollector.repository.*;
 
 import java.math.BigDecimal;
@@ -32,6 +34,8 @@ public class ContentDataService {
     private final GenreRepository genreRepository;
     private final CastRepository castRepository;
     private final CrewRepository crewRepository;
+    private final ActorRepository actorRepository;
+    private final CrewMemberRepository crewMemberRepository;
     private final ContentImageRepository imageRepository;
     private final ContentVideoRepository videoRepository;
     private final WatchProviderRepository watchProviderRepository;
@@ -442,13 +446,27 @@ public class ContentDataService {
         List<Cast> casts = credits.getCast().stream()
                 .limit(20) // 주요 출연진만
                 .map(castDto -> {
+                    // Actor 조회 또는 생성
+                    Actor actor = actorRepository.findById(castDto.getId())
+                            .orElseGet(() -> {
+                                Actor newActor = new Actor();
+                                newActor.setId(castDto.getId());
+                                newActor.setName(castDto.getName());
+                                newActor.setProfilePath(castDto.getProfilePath());
+                                newActor.setGender(castDto.getGender());
+                                return actorRepository.save(newActor);
+                            });
+
                     Cast cast = new Cast();
-                    cast.setPersonId(castDto.getId());
+                    cast.setActor(actor);
                     cast.setContent(content);
-                    cast.setName(castDto.getName());
-                    cast.setCharacter(castDto.getCharacter());
+                    // 캐릭터 이름 길이 체크
+                    String character = castDto.getCharacter();
+                    if (character != null && character.length() > 1000) {
+                        character = character.substring(0, 997) + "...";
+                    }
+                    cast.setCharacter(character);
                     cast.setOrder(castDto.getOrder());
-                    cast.setProfilePath(castDto.getProfilePath());
                     return cast;
                 })
                 .collect(Collectors.toList());
@@ -456,16 +474,27 @@ public class ContentDataService {
 
         // Crew 저장 (감독, 제작자 등 주요 인물만)
         List<Crew> crews = credits.getCrew().stream()
-                .filter(crew -> Arrays.asList("Director", "Producer", "Writer", "Screenplay")
+                .filter(crew -> Arrays.asList("Director", "Producer", "Writer", "Screenplay",
+                                "Executive Producer", "Director of Photography", "Editor", "Original Music Composer")
                         .contains(crew.getJob()))
                 .map(crewDto -> {
+                    // CrewMember 조회 또는 생성
+                    CrewMember crewMember = crewMemberRepository.findById(crewDto.getId())
+                            .orElseGet(() -> {
+                                CrewMember newCrewMember = new CrewMember();
+                                newCrewMember.setId(crewDto.getId());
+                                newCrewMember.setName(crewDto.getName());
+                                newCrewMember.setProfilePath(crewDto.getProfilePath());
+                                newCrewMember.setGender(crewDto.getGender());
+                                newCrewMember.setKnownForDepartment(crewDto.getDepartment());
+                                return crewMemberRepository.save(newCrewMember);
+                            });
+
                     Crew crew = new Crew();
-                    crew.setPersonId(crewDto.getId());
+                    crew.setCrewMember(crewMember);
                     crew.setContent(content);
-                    crew.setName(crewDto.getName());
                     crew.setJob(crewDto.getJob());
                     crew.setDepartment(crewDto.getDepartment());
-                    crew.setProfilePath(crewDto.getProfilePath());
                     return crew;
                 })
                 .collect(Collectors.toList());
@@ -582,6 +611,69 @@ public class ContentDataService {
         }
 
         watchProviderRepository.saveAll(watchProviders);
+    }
+
+    @Transactional
+    public void syncActorDetails(List<Long> actorIds) {
+        log.info("Starting actor details sync for {} actors", actorIds.size());
+
+        Flux.fromIterable(actorIds)
+                .concatMap(actorId -> {
+                    log.info("Fetching details for actor ID: {}", actorId);
+                    return tmdbTvApiClient.getPersonDetail(actorId)
+                            .delayElement(Duration.ofMillis(250))
+                            .onErrorResume(error -> {
+                                log.error("Error fetching details for actor {}: {}", actorId, error.getMessage());
+                                return Mono.empty();
+                            });
+                })
+                .doOnNext(detail -> {
+                    updateActorWithDetails(detail);
+                    log.info("Updated actor: {} with detailed info", detail.getName());
+                })
+                .blockLast();
+    }
+
+    @Transactional
+    public void syncCrewMemberDetails(List<Long> crewMemberIds) {
+        log.info("Starting crew member details sync for {} crew members", crewMemberIds.size());
+
+        Flux.fromIterable(crewMemberIds)
+                .concatMap(crewMemberId -> {
+                    log.info("Fetching details for crew member ID: {}", crewMemberId);
+                    return tmdbTvApiClient.getPersonDetail(crewMemberId)
+                            .delayElement(Duration.ofMillis(250))
+                            .onErrorResume(error -> {
+                                log.error("Error fetching details for crew member {}: {}", crewMemberId, error.getMessage());
+                                return Mono.empty();
+                            });
+                })
+                .doOnNext(detail -> {
+                    updateCrewMemberWithDetails(detail);
+                    log.info("Updated crew member: {} with detailed info", detail.getName());
+                })
+                .blockLast();
+    }
+
+    private void updateActorWithDetails(PersonDetailResponse detail) {
+        actorRepository.findById(detail.getId()).ifPresent(actor -> {
+            actor.setBiography(detail.getBiography());
+            actor.setBirthday(detail.getBirthday());
+            actor.setDeathday(detail.getDeathday());
+            actor.setPlaceOfBirth(detail.getPlaceOfBirth());
+            actor.setPopularity(detail.getPopularity());
+            actorRepository.save(actor);
+        });
+    }
+
+    private void updateCrewMemberWithDetails(PersonDetailResponse detail) {
+        crewMemberRepository.findById(detail.getId()).ifPresent(crewMember -> {
+            crewMember.setBiography(detail.getBiography());
+            crewMember.setBirthday(detail.getBirthday());
+            crewMember.setDeathday(detail.getDeathday());
+            crewMember.setPlaceOfBirth(detail.getPlaceOfBirth());
+            crewMemberRepository.save(crewMember);
+        });
     }
 
     private WatchProvider createWatchProvider(Content content, WatchProviderInfo info, ProviderType type, String country) {

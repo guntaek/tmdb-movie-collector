@@ -3,7 +3,9 @@ package springbootbasic.tmdbmoviecollector.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import springbootbasic.tmdbmoviecollector.repository.ActorRepository;
 import springbootbasic.tmdbmoviecollector.repository.ContentRepository;
+import springbootbasic.tmdbmoviecollector.repository.CrewMemberRepository;
 import springbootbasic.tmdbmoviecollector.service.ContentDataService;
 
 import java.util.HashMap;
@@ -17,6 +19,8 @@ public class SyncController {
 
     private final ContentDataService contentDataService;
     private final ContentRepository contentRepository;
+    private final ActorRepository actorRepository;
+    private final CrewMemberRepository crewMemberRepository;
 
     @PostMapping("/genres")
     public ResponseEntity<String> syncGenres() {
@@ -148,6 +152,35 @@ public class SyncController {
         status.put("totalContents", contentRepository.count());
         status.put("contentIds", contentRepository.findAllMovieIds().size());
 
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping("/actors/details")
+    public ResponseEntity<String> syncActorDetails(@RequestBody List<Long> actorIds) {
+        contentDataService.syncActorDetails(actorIds);
+        return ResponseEntity.ok("Actor details synchronization started for " + actorIds.size() + " actors");
+    }
+
+    @PostMapping("/crew-members/details")
+    public ResponseEntity<String> syncCrewMemberDetails(@RequestBody List<Long> crewMemberIds) {
+        contentDataService.syncCrewMemberDetails(crewMemberIds);
+        return ResponseEntity.ok("Crew member details synchronization started for " + crewMemberIds.size() + " crew members");
+    }
+
+    @GetMapping("/actors/status")
+    public ResponseEntity<Map<String, Object>> getActorStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("totalActors", actorRepository.count());
+        return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/crew-members/status")
+    public ResponseEntity<Map<String, Object>> getCrewMemberStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("totalCrewMembers", crewMemberRepository.count());
+        status.put("directors", crewMemberRepository.findByKnownForDepartment("Directing").size());
+        status.put("writers", crewMemberRepository.findByKnownForDepartment("Writing").size());
+        status.put("producers", crewMemberRepository.findByKnownForDepartment("Production").size());
         return ResponseEntity.ok(status);
     }
 }
