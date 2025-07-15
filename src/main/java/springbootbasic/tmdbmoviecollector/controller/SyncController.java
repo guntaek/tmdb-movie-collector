@@ -221,4 +221,16 @@ public class SyncController {
         contentDataService.syncAllProviders();
         return ResponseEntity.ok("All providers synchronization started");
     }
+
+    @PostMapping("/movies/full-details")
+    public ResponseEntity<String> syncMovieFullDetails(@RequestBody List<Long> movieIds) {
+        contentDataService.syncMovieFullDetails(movieIds);
+        return ResponseEntity.ok("Movie full details synchronization started for " + movieIds.size() + " movies");
+    }
+
+    @PostMapping("/tvs/full-details")
+    public ResponseEntity<String> syncTvFullDetails(@RequestBody List<Long> tvIds) {
+        contentDataService.syncTvFullDetails(tvIds);
+        return ResponseEntity.ok("TV full details synchronization started for " + tvIds.size() + " tvs");
+    }
 }

@@ -193,4 +193,18 @@ public class TmdbTvApiClient {
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
                 .doOnError(error -> log.error("Error fetching provider detail for {}: {}", providerId, error.getMessage()));
     }
+
+    public Mono<ContentFullDetailResponse> getTvFullDetail(Long tvId) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/tv/{tv_id}")
+                        .queryParam("api_key", apiKey)
+                        .queryParam("language", "ko-KR")
+                        .queryParam("append_to_response", "credits,images,videos,watch/providers")
+                        .build(tvId))
+                .retrieve()
+                .bodyToMono(ContentFullDetailResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching full tv detail for {}: {}", tvId, error.getMessage()));
+    }
 }

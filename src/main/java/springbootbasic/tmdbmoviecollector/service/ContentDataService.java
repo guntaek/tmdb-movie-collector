@@ -42,6 +42,154 @@ public class ContentDataService {
     private final ProviderRepository providerRepository;
 
     @Transactional
+    public void syncMovieFullDetails(List<Long> movieIds) {
+        log.info("Starting full details sync for {} movies", movieIds.size());
+
+        Flux.fromIterable(movieIds)
+                .concatMap(movieId -> {
+                    log.info("Fetching full details for movie ID: {}", movieId);
+                    return tmdbMovieApiClient.getMovieFullDetail(movieId)
+                            .delayElement(Duration.ofMillis(250))
+                            .onErrorResume(error -> {
+                                log.error("Error fetching full details for movie {}: {}", movieId, error.getMessage());
+                                return Mono.empty();
+                            });
+                })
+                .doOnNext(fullDetail -> {
+                    // 한 번에 모든 정보 저장
+                    processMovieFullDetail(fullDetail);
+                    log.info("Processed full details for movie: {}", fullDetail.getTitle());
+                })
+                .blockLast();
+    }
+
+    @Transactional
+    public void syncTvFullDetails(List<Long> tvIds) {
+        log.info("Starting full details sync for {} tvs", tvIds.size());
+
+        Flux.fromIterable(tvIds)
+                .concatMap(tvId -> {
+                    log.info("Fetching full details for tv ID: {}", tvId);
+                    return tmdbTvApiClient.getTvFullDetail(tvId)
+                            .delayElement(Duration.ofMillis(250))
+                            .onErrorResume(error -> {
+                                log.error("Error fetching full details for tv {}: {}", tvId, error.getMessage());
+                                return Mono.empty();
+                            });
+                })
+                .doOnNext(fullDetail -> {
+                    // 한 번에 모든 정보 저장
+                    processTvFullDetail(fullDetail);
+                    log.info("Processed full details for tv: {}", fullDetail.getName());
+                })
+                .blockLast();
+    }
+
+    // 통합 처리 메서드
+    private void processMovieFullDetail(ContentFullDetailResponse fullDetail) {
+        // 1. 기본 상세 정보 업데이트
+        updateContentWithDetails(fullDetail, "movie");
+
+        // 2. Credits 저장
+        if (fullDetail.getCredits() != null) {
+            fullDetail.getCredits().setId(fullDetail.getId()); // ID 설정
+            saveCredits(fullDetail.getCredits(), "movie");
+        }
+
+        // 3. Images 저장
+        if (fullDetail.getImages() != null) {
+            fullDetail.getImages().setId(fullDetail.getId());
+            saveImages(fullDetail.getImages(), "movie");
+        }
+
+        // 4. Videos 저장
+        if (fullDetail.getVideos() != null) {
+            fullDetail.getVideos().setId(fullDetail.getId());
+            saveVideos(fullDetail.getVideos(), "movie");
+        }
+
+        // 5. Watch Providers 저장
+        if (fullDetail.getWatchProviders() != null) {
+            fullDetail.getWatchProviders().setId(fullDetail.getId());
+            saveWatchProviders(fullDetail.getWatchProviders(), "movie");
+        }
+    }
+
+    private void processTvFullDetail(ContentFullDetailResponse fullDetail) {
+        // 1. 기본 상세 정보 업데이트
+        updateContentWithDetails(fullDetail, "tv");
+
+        // 2. Credits 저장
+        if (fullDetail.getCredits() != null) {
+            fullDetail.getCredits().setId(fullDetail.getId());
+            saveCredits(fullDetail.getCredits(), "tv");
+        }
+
+        // 3. Images 저장
+        if (fullDetail.getImages() != null) {
+            fullDetail.getImages().setId(fullDetail.getId());
+            saveImages(fullDetail.getImages(), "tv");
+        }
+
+        // 4. Videos 저장
+        if (fullDetail.getVideos() != null) {
+            fullDetail.getVideos().setId(fullDetail.getId());
+            saveVideos(fullDetail.getVideos(), "tv");
+        }
+
+        // 5. Watch Providers 저장
+        if (fullDetail.getWatchProviders() != null) {
+            fullDetail.getWatchProviders().setId(fullDetail.getId());
+            saveWatchProviders(fullDetail.getWatchProviders(), "tv");
+        }
+    }
+
+    // 5. 기존 개별 동기화 메서드를 최적화된 버전으로 대체
+    @Transactional
+    public void syncAllContentData(int pagesPerCategory, boolean includeDetails) {
+        // 1. 장르 동기화
+        syncGenres();
+
+        // 2. Provider 동기화
+        syncAllProviders();
+
+        // 3. 기본 데이터 동기화
+        syncNowPlayingMovies(pagesPerCategory);
+        syncUpcomingMovies(pagesPerCategory);
+        syncOnTheAirTvs(pagesPerCategory);
+        syncPopular(pagesPerCategory);
+        syncTopRated(pagesPerCategory);
+
+        if (includeDetails) {
+            // 4. 통합 상세 정보 동기화 (한 번의 API 호출로 모든 정보 가져오기)
+            List<Long> allMovieIds = contentRepository.findAllMovieIds();
+            List<Long> allTvIds = contentRepository.findAllTvIds();
+
+            log.info("Found {} movies and {} tvs. Starting full details sync...",
+                    allMovieIds.size(), allTvIds.size());
+
+            // 배치로 처리
+            int batchSize = 100;
+
+            // 영화 상세 정보 (한 번의 호출로 모든 정보)
+            for (int i = 0; i < allMovieIds.size(); i += batchSize) {
+                List<Long> batch = allMovieIds.subList(i, Math.min(i + batchSize, allMovieIds.size()));
+                log.info("Processing movie batch {}/{}", (i/batchSize) + 1, (allMovieIds.size()/batchSize) + 1);
+                syncMovieFullDetails(batch);
+            }
+
+            // TV 상세 정보 (한 번의 호출로 모든 정보)
+            for (int i = 0; i < allTvIds.size(); i += batchSize) {
+                List<Long> batch = allTvIds.subList(i, Math.min(i + batchSize, allTvIds.size()));
+                log.info("Processing tv batch {}/{}", (i/batchSize) + 1, (allTvIds.size()/batchSize) + 1);
+                syncTvFullDetails(batch);
+            }
+        }
+
+        log.info("All content data synchronization completed!");
+    }
+
+    @Transactional
     public void syncGenres() {
         log.info("Starting genre synchronization...");
 
@@ -353,7 +501,6 @@ public class ContentDataService {
                 .blockLast();
     }
 
-    // 스트리밍 제공자 정보 동기화
     @Transactional
     public void syncWatchTvProviders(List<Long> tvIds) {
         log.info("Starting watch providers sync for {} tvs", tvIds.size());
@@ -374,54 +521,55 @@ public class ContentDataService {
                 .blockLast();
     }
 
+    // 스트리밍 제공자 정보 동기화
     // 전체 데이터 동기화 (기본 + 상세 정보)
-    @Transactional
-    public void syncAllContentData(int pagesPerCategory, boolean includeDetails) {
-        // 1. 장르 동기화
-        syncGenres();
-
-        // 2. 기본 데이터 동기화
-        syncNowPlayingMovies(pagesPerCategory);
-        syncUpcomingMovies(pagesPerCategory);
-        syncOnTheAirTvs(pagesPerCategory);
-        syncPopular(pagesPerCategory);
-        syncTopRated(pagesPerCategory);
-
-        if (includeDetails) {
-            // 3. 저장된 모든 영화 ID 가져오기
-            List<Long> allMovieIds = contentRepository.findAllMovieIds();
-            log.info("Found {} movies in database. Starting detailed sync...", allMovieIds.size());
-
-            // 4. 상세 정보 동기화 (배치로 처리)
-            int batchSize = 100;
-            for (int i = 0; i < allMovieIds.size(); i += batchSize) {
-                List<Long> batch = allMovieIds.subList(i, Math.min(i + batchSize, allMovieIds.size()));
-                log.info("Processing batch {}/{}", (i/batchSize) + 1, (allMovieIds.size()/batchSize) + 1);
-
-                syncMovieDetails(batch);
-                syncMovieCredits(batch);
-                syncMovieImages(batch);
-                syncMovieVideos(batch);
-                syncWatchMovieProviders(batch);
-            }
-
-            List<Long> allTvIds = contentRepository.findAllTvIds();
-            log.info("Found {} tvs in database. Starting detailed sync...", allTvIds.size());
-
-            for (int i = 0; i < allTvIds.size(); i += batchSize) {
-                List<Long> batch = allTvIds.subList(i, Math.min(i + batchSize, allTvIds.size()));
-                log.info("Processing batch {}/{}", (i/batchSize) + 1, (allTvIds.size()/batchSize) + 1);
-
-                syncTvDetails(batch);
-                syncTvCredits(batch);
-                syncTvImages(batch);
-                syncTvVideos(batch);
-                syncWatchTvProviders(batch);
-            }
-        }
-
-        log.info("All content data synchronization completed!");
-    }
+//    @Transactional
+//    public void syncAllContentData(int pagesPerCategory, boolean includeDetails) {
+//        // 1. 장르 동기화
+//        syncGenres();
+//
+//        // 2. 기본 데이터 동기화
+//        syncNowPlayingMovies(pagesPerCategory);
+//        syncUpcomingMovies(pagesPerCategory);
+//        syncOnTheAirTvs(pagesPerCategory);
+//        syncPopular(pagesPerCategory);
+//        syncTopRated(pagesPerCategory);
+//
+//        if (includeDetails) {
+//            // 3. 저장된 모든 영화 ID 가져오기
+//            List<Long> allMovieIds = contentRepository.findAllMovieIds();
+//            log.info("Found {} movies in database. Starting detailed sync...", allMovieIds.size());
+//
+//            // 4. 상세 정보 동기화 (배치로 처리)
+//            int batchSize = 100;
+//            for (int i = 0; i < allMovieIds.size(); i += batchSize) {
+//                List<Long> batch = allMovieIds.subList(i, Math.min(i + batchSize, allMovieIds.size()));
+//                log.info("Processing batch {}/{}", (i/batchSize) + 1, (allMovieIds.size()/batchSize) + 1);
+//
+//                syncMovieDetails(batch);
+//                syncMovieCredits(batch);
+////                syncMovieImages(batch);
+//                syncMovieVideos(batch);
+//                syncWatchMovieProviders(batch);
+//            }
+//
+//            List<Long> allTvIds = contentRepository.findAllTvIds();
+//            log.info("Found {} tvs in database. Starting detailed sync...", allTvIds.size());
+//
+//            for (int i = 0; i < allTvIds.size(); i += batchSize) {
+//                List<Long> batch = allTvIds.subList(i, Math.min(i + batchSize, allTvIds.size()));
+//                log.info("Processing batch {}/{}", (i/batchSize) + 1, (allTvIds.size()/batchSize) + 1);
+//
+//                syncTvDetails(batch);
+//                syncTvCredits(batch);
+////                syncTvImages(batch);
+//                syncTvVideos(batch);
+//                syncWatchTvProviders(batch);
+//            }
+//        }
+//
+//        log.info("All content data synchronization completed!");
+//    }
 
     // Helper methods
     private void updateContentWithDetails(ContentDetailResponse detail, String type) {

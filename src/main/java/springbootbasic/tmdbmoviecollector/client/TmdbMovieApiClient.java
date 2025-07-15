@@ -194,4 +194,18 @@ public class TmdbMovieApiClient {
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
                 .doOnError(error -> log.error("Error fetching provider detail for {}: {}", providerId, error.getMessage()));
     }
+
+    public Mono<ContentFullDetailResponse> getMovieFullDetail(Long movieId) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/movie/{movie_id}")
+                        .queryParam("api_key", apiKey)
+                        .queryParam("language", "ko-KR")
+                        .queryParam("append_to_response", "credits,images,videos,watch/providers")
+                        .build(movieId))
+                .retrieve()
+                .bodyToMono(ContentFullDetailResponse.class)
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(retryDelay)))
+                .doOnError(error -> log.error("Error fetching full movie detail for {}: {}", movieId, error.getMessage()));
+    }
 }
